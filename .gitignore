@@ -1,0 +1,6 @@
+__pycache_/
+*.pyc
+chroma_db/
+vectorstore/
+WorkoutProgram.xlsx
+.env
