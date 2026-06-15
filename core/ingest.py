@@ -173,53 +173,86 @@ def _sessions_to_documents(sessions: list[dict], sheet_name: str, source_path: s
         is_rest = session.get("is_rest_day", False)
         week = session.get("week") or sheet_name
         day = session.get("day") or "Unknown day"
-        session_name = session.get("exercises") or []
+        session_name = session.get("session_name") or "General Workout Session"
         exercises = session.get("exercises") or []
 
-        #Human readable content
-        header = f"{week}, {day}"
-        if session_name:
-            header += f" - {session_name}"
+        all_exercise_names = [ex.get("name", "") for ex in exercises if ex.get("name")]
 
         if is_rest:
-            content = f"{header}\nRest day."
+            content = [
+                f"Week: {week}",
+                f"Day: {day}",
+                f"Workout: {session_name}",
+                "Exercise: Rest Day",
+                "Prescription: N/A",
+                "Performed: Rest, recovery, and mobile conditioning.",
+                "Other exercises this day: None"
+            ]
+            content = "\n".join(content)
+
+            metadata = {
+                "week": week,
+            "day": day,
+            "session_name": session_name,
+            "is_rest_day": True,
+            "exercise_name": "Rest Day",
+            "exercise_names": ["Rest Day"], # Keeps pipeline.py compatibility
+            "sheet_name": sheet_name,
+            "source": source_path,
+            }
+            documents.append(Document(page_content=content, metadata=metadata))
         else:
-            lines = [header]
             for ex in exercises:
-                name = ex.get("name", "Unknown exercise")
-                prescribed = ex.get("prescribed_sets_reps")
-                weight = ex.get("actual_weight")
-                reps = ex.get("actual_reps")
-                notes = ex.get("notes")
+                current_name = ex.get("name", "Unknown exercise").strip()
+                prescribed = ex.get("prescribed_sets_reps") or "Not Specified"
+                weight = ex.get("actual_weight") or ""
+                reps = ex.get("actual_reps") or ""
+                notes = ex.get("notes") or ""
 
-                parts = [f" {name}"]
-                if prescribed:
-                    parts.append(f" | Prescribed: {prescribed}")
-                if weight:
-                    parts.append(f" | Weight: {weight}")
-                if reps:
-                    parts.append(f" | Reps: {reps}")
+                other_exercises = [name for name in all_exercise_names if name != current_name]
+                other_ex_str = ", ".join(other_exercises) if other_exercises else "None"
+                
+                performed_string = "No log data provided."
+                if weight or reps:
+                    weight_list = [w.strip() for w in str(weight).split(",") if w.strip()]
+                    reps_list = [r.strip() for r in str(reps).split(",") if r.strip()]
+
+                    if len(weight_list) == len(reps_list) and len(weight_list) > 0:
+                        set_strings = [f"{w} lbs x {r}" for w, r in zip(weight_list, reps_list)]
+                        performed_string = ", ".join(set_strings)
+                    else:
+                        perf_parts = []
+                        if weight_list:
+                            perf_parts.append(f"Weight: {weight_list[0]}")
+                        if reps_list:
+                            perf_parts.append(f"Reps: {reps_list[0]}")
+                        performed_string = "| ".join(perf_parts)
                 if notes:
-                    parts.append(f" | Notes: {notes}")
-                lines.append("".join(parts))
-            content = "\n".join(lines)
+                    performed_string += f" | Notes: {notes}"
+                
+                content = [
+                    f"Week: {week}",
+                    f"Day: {day}",
+                    f"Workout: {session_name}",
+                    f"Exercise: {current_name}",
+                    f"Prescription: {prescribed}",
+                    f"Performed: {performed_string}",
+                    f"Other exercises this day: {other_ex_str}"
+                ]
+                content = "\n".join(content)
         
-        # Metadata for filtering
-        exercise_names = [
-            ex.get("name", "") for ex in exercises if ex.get("name")
-        ]
-        metadata = {
-            "week":           week,
-            "day":            day,
-            "session_name":   session_name,
-            "is_rest_day":    is_rest,
-            "exercise_names": exercise_names,
-            "exercise_names_str": ", ".join(exercise_names),
-            "sheet_name":     sheet_name,
-            "source":         source_path,
-        }
+                metadata = {
+                    "week":           week,
+                    "day":            day,
+                    "session_name":   session_name,
+                    "is_rest_day":    False,
+                    "exercise_name": current_name,
+                    "exercise_names": all_exercise_names, # For easier retrieval filtering
+                    "sheet_name":     sheet_name,
+                    "source":         source_path,
+                }
 
-        documents.append(Document(page_content=content, metadata=metadata))
+                documents.append(Document(page_content=content, metadata=metadata))
 
     return documents
 
