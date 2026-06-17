@@ -104,7 +104,7 @@ def main():
 
     # Phase 2: Build retriever
     print("\n[main] Phase 2: Building hybrid retriever...")
-    retriever = build_retriever(
+    retriever, vectorstore = build_retriever(
         documents=documents,
         api_key=api_key,
         force_rebuild=args.rebuild,
@@ -112,9 +112,17 @@ def main():
 
     # Phase 3: Build RAG chain
     if args.sources:
-        chain = build_rag_chain_with_sources(retriever, api_key, model=args.model)
+        chain_builder = build_rag_chain_with_sources(retriever, api_key, model=args.model)
     else:
-        chain = build_rag_chain(retriever, api_key, model=args.model)
+        chain_builder = build_rag_chain(retriever, api_key, model=args.model)
+
+    chain = chain_builder(
+        retriever= retriever,
+        vectorstore=vectorstore,
+        documents=documents,
+        api_key = api_key,
+        model = args.model,
+    )
 
     print("\nReady. Ask anything about your workout program. Type 'quit' to exit.\n")
 
@@ -158,6 +166,8 @@ def _print_sources(docs):
         m = doc.metadata
         print(f"\n[{i}] {m.get('week')} | {m.get('day')} — {m.get('session_name', '')}")
         print(f"    Exercises: {m.get('exercise_names_str', 'N/A')}")
+        print(f"    Original:  {m.get('original_exercise_name', 'N/A')}")
+        print(f"    Strategy:  routed by chain intent detection")
     print("────────────────────────────────────────────────────")
 
 

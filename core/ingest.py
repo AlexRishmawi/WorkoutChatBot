@@ -5,6 +5,9 @@ import openpyxl
 from langchain_core.documents import Document
 from langchain_google_genai import ChatGoogleGenerativeAI
 from dotenv import load_dotenv
+from exercise_aliases import normalize_exercise_name
+from exercise_aliases import get_all_aliases
+from exercise_aliases import expand_query_aliases
 
 load_dotenv()
 
@@ -178,6 +181,15 @@ def _sessions_to_documents(sessions: list[dict], sheet_name: str, source_path: s
 
         all_exercise_names = [ex.get("name", "") for ex in exercises if ex.get("name")]
 
+        named_exercises: list[tuple[str, str]] = []
+        for ex in exercises:
+            raw_name = ex.get("name") or ""
+            if raw_name.strip():
+                canonical = normalize_exercise_name(raw_name)
+                named_exercises.append((raw_name.strip(), canonical))
+ 
+        all_canonical_names  = [c for _, c in named_exercises]
+        all_original_names   = [o for o, _ in named_exercises]
         if is_rest:
             content = [
                 f"Week: {week}",
@@ -191,68 +203,90 @@ def _sessions_to_documents(sessions: list[dict], sheet_name: str, source_path: s
             content = "\n".join(content)
 
             metadata = {
-                "week": week,
+            "week": week,
             "day": day,
             "session_name": session_name,
             "is_rest_day": True,
             "exercise_name": "Rest Day",
+            "original_exercise_name": "Rest Day",
+            "exercise aliases": [],
             "exercise_names": ["Rest Day"], # Keeps pipeline.py compatibility
             "sheet_name": sheet_name,
             "source": source_path,
             }
             documents.append(Document(page_content=content, metadata=metadata))
-        else:
-            for ex in exercises:
-                current_name = ex.get("name", "Unknown exercise").strip()
-                prescribed = ex.get("prescribed_sets_reps") or "Not Specified"
-                weight = ex.get("actual_weight") or ""
-                reps = ex.get("actual_reps") or ""
-                notes = ex.get("notes") or ""
+            continue
+        for idx, ex in enumerate(exercises):
+            raw_name = (ex.get("name") or "Unknown exercise").strip()
+            canonical = normalize_exercise_name(raw_name)
+            aliases = get_all_aliases(canonical)
+            prescribed = ex.get("prescribed_sets_reps") or "Not Specified"
+            weight = ex.get("actual_weight") or ""
+            reps = ex.get("actual_reps") or ""
+            notes = ex.get("notes") or ""
 
-                other_exercises = [name for name in all_exercise_names if name != current_name]
-                other_ex_str = ", ".join(other_exercises) if other_exercises else "None"
-                
-                performed_string = "No log data provided."
-                if weight or reps:
-                    weight_list = [w.strip() for w in str(weight).split(",") if w.strip()]
-                    reps_list = [r.strip() for r in str(reps).split(",") if r.strip()]
+            other_canonicals = [c for c in all_canonical_names if c != canonical]
+            other_ex_str = ", ".join(other_canonicals) if other_canonicals else "None"
+            
+            performed_string = "No log data provided."
+            if weight or reps:
+                weight_list = [w.strip() for w in str(weight).split(",") if w.strip()]
+                reps_list = [r.strip() for r in str(reps).split(",") if r.strip()]
 
-                    if len(weight_list) == len(reps_list) and len(weight_list) > 0:
-                        set_strings = [f"{w} lbs x {r}" for w, r in zip(weight_list, reps_list)]
-                        performed_string = ", ".join(set_strings)
-                    else:
-                        perf_parts = []
-                        if weight_list:
-                            perf_parts.append(f"Weight: {weight_list[0]}")
-                        if reps_list:
-                            perf_parts.append(f"Reps: {reps_list[0]}")
-                        performed_string = "| ".join(perf_parts)
-                if notes:
-                    performed_string += f" | Notes: {notes}"
-                
-                content = [
-                    f"Week: {week}",
-                    f"Day: {day}",
-                    f"Workout: {session_name}",
-                    f"Exercise: {current_name}",
-                    f"Prescription: {prescribed}",
-                    f"Performed: {performed_string}",
-                    f"Other exercises this day: {other_ex_str}"
-                ]
-                content = "\n".join(content)
-        
-                metadata = {
-                    "week":           week,
-                    "day":            day,
-                    "session_name":   session_name,
-                    "is_rest_day":    False,
-                    "exercise_name": current_name,
-                    "exercise_names": all_exercise_names, # For easier retrieval filtering
-                    "sheet_name":     sheet_name,
-                    "source":         source_path,
-                }
+                if len(weight_list) == len(reps_list) and len(weight_list) > 0:
+                    set_strings = [f"{w} lbs x {r}" for w, r in zip(weight_list, reps_list)]
+                    performed_string = ", ".join(set_strings)
+                else:
+                    perf_parts = []
+                    if weight_list:
+                        perf_parts.append(f"Weight: {weight_list[0]}")
+                    if reps_list:
+                        perf_parts.append(f"Reps: {reps_list[0]}")
+                    performed_string = "| ".join(perf_parts)
+            if notes:
+                performed_string += f" | Notes: {notes}"
+            
+            content = [
+                f"Week: {week}",
+                f"Day: {day}",
+                f"Workout: {session_name}",
+                f"Exercise: {raw_name}"
+            ]
+            if raw_name.lower() != canonical.lower():
+                content.append(f"Also known as: {raw_name}")
+            content += [
+                f"Prescription: {prescribed}",
+                f"Performed: {performed_string}",
+                f"Other exercises this day: {other_ex_str}"
+            ]
+            content = "\n".join(content)
+    
+            metadata = {
+                "week":           week,
+                "day":            day,
+                "session_name":   session_name,
+                "is_rest_day":    False,
+                "exercise_name": canonical,
+                "original_exercise_name": raw_name,
+                "exercise_aliases": aliases,
+                "exercise_names": all_canonical_names,
+                "original_exercise_names": all_original_names,
+                "sheet_name":     sheet_name,
+                "source":         source_path,
+            }
 
-                documents.append(Document(page_content=content, metadata=metadata))
+            documents.append(Document(page_content=content, metadata=metadata))
 
     return documents
 
+def build_alias_filter(user_exercise_query: str) -> dict | None:
+    """
+    Given a user's exercise query, return a LangChain metadata filer
+    that matches any document with known exercise synonym.
+    """
+
+    expansions = expand_query_aliases(user_exercise_query)
+    if not expansions:
+        return None
+    
+    return {"exercise_name": {"$in": expansions}}
