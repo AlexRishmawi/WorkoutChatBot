@@ -29,9 +29,10 @@ BM25 ─┐
        ├─→ Ensemble merge ─→ [THIS MODULE] re-rank ─→ top N ─→ Gemini
 Dense ─┘
 """
-
 from __future__ import annotations
-
+import os
+from huggingface_hub import scan_cache_dir
+from sentence_transformers import CrossEncoder
 from langchain_core.documents import Document
 
 # ---------------------------------------------------------------------------
@@ -39,7 +40,7 @@ from langchain_core.documents import Document
 # ---------------------------------------------------------------------------
 
 CROSS_ENCODER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-DEFAULT_TOP_N = 5
+DEFAULT_TOP_N = 16
 
 # Lazy-loaded singleton — loading a cross-encoder takes ~1-2s and we don't
 # want that cost paid at import time (e.g. during eval_pipeline startup
@@ -49,12 +50,29 @@ _model = None
 
 def _get_model():
     global _model
-    if _model is None:
-        from sentence_transformers import CrossEncoder
-        print(f"[Reranker] Loading cross-encoder '{CROSS_ENCODER_MODEL}'...")
+    if _model is not None:
+        return _model
+    cached = any(
+        repo.repo_id == CROSS_ENCODER_MODEL
+        for repo in scan_cache_dir().repos
+    )
+    if cached:
+        os.environ.setdefault("HF_HUB_OFFLINE", "1")
+ 
+    print(f"[Reranker] Loading cross-encoder '{CROSS_ENCODER_MODEL}'"
+          f"{' (offline, from cache)' if cached else ' (downloading...)'}")
+ 
+    try:
         _model = CrossEncoder(CROSS_ENCODER_MODEL)
-        print("[Reranker] Model loaded.")
+    except Exception as e:
+        raise RuntimeError(
+            f"[Reranker] Failed to load '{CROSS_ENCODER_MODEL}'. "
+            f"Original error: {e}"
+        ) from e
+ 
+    print("[Reranker] Model loaded.")
     return _model
+
 
 
 # ---------------------------------------------------------------------------
