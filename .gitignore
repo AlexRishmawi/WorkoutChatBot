@@ -4,4 +4,3 @@ chroma_db/
 vectorstore/
 WorkoutProgram.xlsx
 .env
-ProductionImplementation.md
