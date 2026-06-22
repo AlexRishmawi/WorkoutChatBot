@@ -208,7 +208,7 @@ def _build_sparse_retriever(documents, k_retrieve):
     return retriever
 
 def search_by_exercise(vectorstore: Chroma, exercise_name: str, use_reranker: bool = True, top_n: int | None = None) -> list[Document]:
-    k_retrieve = n_rerank = _get_sizing(vectorstore)
+    k_retrieve , n_rerank = _get_sizing(vectorstore)
     if top_n is None:
         top_n = n_rerank
 

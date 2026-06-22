@@ -24,7 +24,8 @@ import os
 import sys
 from ingest import load_workout_documents
 from pipeline import build_retriever
-from chain import build_rag_chain, build_rag_chain_with_sources
+from chain import build_rag_chain, build_rag_chain_with_sources, get_session_history
+from langchain_core.runnables import RunnableWithMessageHistory
 
 
 CACHE_PATH = os.path.join(os.path.dirname(__file__), "vectorstore", "extracted_docs.json")
@@ -112,16 +113,17 @@ def main():
 
     # Phase 3: Build RAG chain
     if args.sources:
-        chain_builder = build_rag_chain_with_sources(retriever, api_key, model=args.model)
+        chain = build_rag_chain_with_sources(retriever, vectorstore, documents, api_key, model=args.model)
     else:
-        chain_builder = build_rag_chain(retriever, api_key, model=args.model)
+        chain = build_rag_chain(retriever, vectorstore, documents, api_key, model=args.model)
 
-    chain = chain_builder(
-        retriever= retriever,
-        vectorstore=vectorstore,
-        documents=documents,
-        api_key = api_key,
-        model = args.model,
+
+    chain = RunnableWithMessageHistory(
+        chain,
+        get_session_history,
+        input_messages_key="question",
+        history_messages_key="history",
+        output_messages_key="answer" if args.sources else None
     )
 
     print("\nReady. Ask anything about your workout program. Type 'quit' to exit.\n")
@@ -147,9 +149,11 @@ def main():
         print()
 
 
-def _ask(chain, question, show_sources=False):
+def _ask(chain, question, session_id="cli-session", show_sources=False):
     print("\nAssistant: ", end="", flush=True)
-    result = chain.invoke({"question": question})
+    result = chain.invoke(
+        {"question": question},
+        config={"configurable": {"session_id": session_id}})
     if isinstance(result, dict):
         print(result["answer"])
         if show_sources:

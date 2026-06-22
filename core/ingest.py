@@ -59,6 +59,8 @@ Raw cell contents (row number | col number | value):
  
 Extract all workout sessions from this sheet and return the JSON array."""
 
+_MAX_EXTRACTION_RETRIES = 2
+
 
 def load_workout_documents(xlsx_path: str, api_key: str) -> list[Document]:
     """
@@ -83,7 +85,7 @@ def load_workout_documents(xlsx_path: str, api_key: str) -> list[Document]:
             print(f"[Ingest]    Sheet '{sheet_name}' appears empty, skipping.")
             continue
 
-        sessions = _extract_sessions_via_llm(llm, sheet_name, cell_dump)
+        sessions = _extract_sessions_via_llm_with_retry(llm, sheet_name, cell_dump)
         if not sessions:
             print(f"[Ingest]    No sessions found in '{sheet_name}'.")
             continue
@@ -106,6 +108,7 @@ def _dump_sheet(ws) -> str:
     """
     Converts a worksheet into a text representation for the LLM.
     Format: "row R | col C | <value>" One line per non-empty cell
+    Kept as single full sheet dump so llm can see full context.
     """
 
     lines = []
@@ -118,9 +121,9 @@ def _dump_sheet(ws) -> str:
 
 # LLM Extraction
 
-def _extract_sessions_via_llm(llm, sheet_name: str, cell_dump: str) -> list[dict]:
+def _extract_sessions_via_llm(llm, sheet_name: str, cell_dump: str) -> tuple[list[dict], str]:
     """
-    Send raw cell dump to LLM and get back a list of session dicts.
+    Send raw cell dump to LLM and get back a list of session dicts and raw response text.
     """
 
     prompt = _EXTRACTION_USER_TEMPLATE.format(
@@ -136,7 +139,25 @@ def _extract_sessions_via_llm(llm, sheet_name: str, cell_dump: str) -> list[dict
     response = llm.invoke(messages)
     raw_text = response.content.strip()
 
-    return _parse_json_response(raw_text, sheet_name)
+    return _parse_json_response(raw_text, sheet_name), raw_text
+
+def _extract_sessions_via_llm_with_retry(llm, sheet_name: str, cell_dump: str) -> list[dict]:
+    """
+    Wraps _extract_sessions_via_llm with retries on parse failure.
+    """
+    last_raw_text = ""
+    for attempt in range(1, _MAX_EXTRACTION_RETRIES + 1):
+        sessions, raw_text = _extract_sessions_via_llm(llm, sheet_name, cell_dump)
+        last_raw_text = raw_text
+        if sessions:
+            return sessions
+        print(f"[Ingest]    Retry {attempt}/{_MAX_EXTRACTION_RETRIES} for sheet "
+              f"'{sheet_name}' (empty/unparseable response)...")
+
+    print(f"[Ingest]    FINAL FAILURE for sheet '{sheet_name}' after "
+          f"{_MAX_EXTRACTION_RETRIES} retries.")
+    print(f"[Ingest]    Last raw response snippet: {last_raw_text[:300]}")
+    return []
 
 
 def _parse_json_response(raw_text: str, sheet_name: str) -> list[dict]:
@@ -209,7 +230,7 @@ def _sessions_to_documents(sessions: list[dict], sheet_name: str, source_path: s
             "is_rest_day": True,
             "exercise_name": "Rest Day",
             "original_exercise_name": "Rest Day",
-            "exercise aliases": [],
+            "exercise_aliases": [],
             "exercise_names": ["Rest Day"], # Keeps pipeline.py compatibility
             "sheet_name": sheet_name,
             "source": source_path,
@@ -217,13 +238,22 @@ def _sessions_to_documents(sessions: list[dict], sheet_name: str, source_path: s
             documents.append(Document(page_content=content, metadata=metadata))
             continue
         for idx, ex in enumerate(exercises):
-            raw_name = (ex.get("name") or "Unknown exercise").strip()
+            raw_name = (ex.get("name") or "").strip()
+            if not raw_name:
+                print(f"[Ingest]    WARNING: '{sheet_name}' {week}/{day} exercise #{idx+1} "
+                f"has no name in extracted data — using 'Unknown exercise'.")
+                raw_name = "Unknown exercise"
+            
             canonical = normalize_exercise_name(raw_name)
             aliases = get_all_aliases(canonical)
             prescribed = ex.get("prescribed_sets_reps") or "Not Specified"
             weight = ex.get("actual_weight") or ""
             reps = ex.get("actual_reps") or ""
             notes = ex.get("notes") or ""
+
+            if not weight and not reps:
+                print(f"[Ingest]    WARNING: '{sheet_name}' {week}/{day} '{raw_name}' "
+                f"has no weight or reps logged.")
 
             other_canonicals = [c for c in all_canonical_names if c != canonical]
             other_ex_str = ", ".join(other_canonicals) if other_canonicals else "None"
@@ -239,10 +269,14 @@ def _sessions_to_documents(sessions: list[dict], sheet_name: str, source_path: s
                 else:
                     perf_parts = []
                     if weight_list:
-                        perf_parts.append(f"Weight: {weight_list[0]}")
+                        perf_parts.append(f"Weight: {', '.join(weight_list)}")
                     if reps_list:
-                        perf_parts.append(f"Reps: {reps_list[0]}")
+                        perf_parts.append(f"Reps: {', '.join(reps_list)}")
                     performed_string = "| ".join(perf_parts)
+                    if len(weight_list) != len(reps_list) and weight_list and reps_list:
+                        print(f"[Ingest]    NOTE: '{sheet_name}' {week}/{day} '{raw_name}' "
+                        f"has mismatched weight/reps counts ({len(weight_list)} vs "
+                        f"{len(reps_list)}) — kept all values, unpaired by set.")
             if notes:
                 performed_string += f" | Notes: {notes}"
             
@@ -289,4 +323,9 @@ def build_alias_filter(user_exercise_query: str) -> dict | None:
     if not expansions:
         return None
     
-    return {"exercise_name": {"$in": expansions}}
+    return {
+        "$or": [
+        {"exercise_name": {"$in": expansions}},
+        {"exercise_aliases": {"$in": expansions}},
+        ]
+    }

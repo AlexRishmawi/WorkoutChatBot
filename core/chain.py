@@ -4,10 +4,13 @@ RAG Chain: hybrid retriever -> LLM -> answer
 from collections import defaultdict
 from operator import itemgetter
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from langchain_core.documents import Document
+from langchain_core.chat_history import BaseChatMessageHistory
+from langchain_community.chat_message_histories import ChatMessageHistory
+from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_classic.retrievers import EnsembleRetriever
 from exercise_aliases import expand_query_aliases
 from pipeline import get_exercise_history, search_by_exercise, search_sessions
@@ -29,9 +32,23 @@ Strict Synthesis Rules:
 
 Context Data:
 {context}"""
+
  
 _PROMPT = ChatPromptTemplate.from_messages([
     ("system", SYSTEM_PROMPT),
+    MessagesPlaceholder(variable_name="history"),
+    ("human", "{question}"),
+])
+
+_CONDENSE_PROMPT = ChatPromptTemplate.from_messages([
+    ("system",
+     "Given the conversation history and a follow-up question, rewrite the follow-up "
+     "question to be a standalone question that includes all necessary context "
+     "(exercise names, weeks, days) from the history. "
+     "If the follow-up question is already standalone, return it unchanged. "
+     "Do not answer the question — only rewrite it. Return ONLY the rewritten question, "
+     "no preamble, no quotes."),
+    MessagesPlaceholder(variable_name="history"),
     ("human", "{question}"),
 ])
 
@@ -50,6 +67,13 @@ _DETAIL_KEYWORDS = {
     "technique", "what did i write", "logged about",
 }
 
+_store: dict[str, BaseChatMessageHistory] = {}
+
+def get_session_history(session_id: str) -> BaseChatMessageHistory:
+    if session_id not in _store:
+        _store[session_id] = ChatMessageHistory()
+    return _store[session_id]
+
 def _detect_exercise_term(query: str) -> str | None:
     """
     Return the first recognized exercise term found in the query,
@@ -63,6 +87,17 @@ def _detect_exercise_term(query: str) -> str | None:
         return None
     # expansions[0] is always the canonical name
     return expansions[0]
+
+def _condense_question(llm: ChatGoogleGenerativeAI, question: str, history: list) -> str:
+    if not history:
+        return question
+    
+    rewritten = llm.invoke(
+        _CONDENSE_PROMPT.invoke({"question": question, "history": history})
+    )
+    standalone = StrOutputParser().invoke(rewritten).strip()
+    print(f"[Chain] Condensed query: '{question}' -> '{standalone}'")
+    return standalone
 
 def _is_history_query(query: str) -> bool:
     q = query.lower()
@@ -126,10 +161,12 @@ def build_rag_chain(retriever: EnsembleRetriever, vectorstore: Chroma, documents
 
     def run(inputs: dict) -> str:
         question = inputs["question"]
-        docs, strategy = route_and_retrieve(question, documents, vectorstore, retriever)
+        history = inputs.get("history", [])
+        standalone_question = _condense_question(llm, question, history)
+        docs, strategy = route_and_retrieve(standalone_question, documents, vectorstore, retriever)
         print(f"[Chain] Strategy: {strategy} -> {len(docs)} docs retrieved")
         context = _format_docs(docs)
-        answer = llm.invoke(_PROMPT.invoke({"context": context, "question": question}))
+        answer = llm.invoke(_PROMPT.invoke({"context": context, "question": question, "history": history}))
         return StrOutputParser().invoke(answer)
     
     return RunnableLambda(run)
@@ -144,10 +181,12 @@ def build_rag_chain_with_sources(retriever: EnsembleRetriever, vectorstore: Chro
 
     def run(inputs: dict) -> dict:
         question = inputs["question"]
-        docs, strategy = route_and_retrieve(question, documents, vectorstore, retriever)
+        history = inputs.get("history", [])
+        standalone_question = _condense_question(llm, question, history)
+        docs, strategy = route_and_retrieve(standalone_question, documents, vectorstore, retriever)
         print(f"[Chain] Strategy: {strategy} → {len(docs)} docs retrieved")
         context = _format_docs(docs)
-        answer = llm.invoke(_PROMPT.invoke({"context": context, "question": question}))
+        answer = llm.invoke(_PROMPT.invoke({"context": context, "question": question, "history": history}))
         return {
             "answer": StrOutputParser().invoke(answer),
             "source_documents": docs,
