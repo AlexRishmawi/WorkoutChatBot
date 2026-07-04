@@ -1,4 +1,8 @@
 import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "core"))
+
 import json
 import re
 import openpyxl
@@ -8,6 +12,7 @@ from dotenv import load_dotenv
 from exercise_aliases import normalize_exercise_name
 from exercise_aliases import get_all_aliases
 from exercise_aliases import expand_query_aliases
+
 
 load_dotenv()
 
@@ -230,7 +235,7 @@ def _sessions_to_documents(sessions: list[dict], sheet_name: str, source_path: s
             "is_rest_day": True,
             "exercise_name": "Rest Day",
             "original_exercise_name": "Rest Day",
-            "exercise_aliases": [],
+            "exercise_aliases": ["N/A"],
             "exercise_names": ["Rest Day"], # Keeps pipeline.py compatibility
             "sheet_name": sheet_name,
             "source": source_path,
@@ -295,6 +300,10 @@ def _sessions_to_documents(sessions: list[dict], sheet_name: str, source_path: s
             ]
             content = "\n".join(content)
     
+            # Apply safe fallbacks using explicit placeholder arrays if any are empty
+            safe_aliases = list(aliases) if aliases else ["none"]
+            safe_canonical_names = list(all_canonical_names) if all_canonical_names else ["none"]
+            safe_original_names = list(all_original_names) if all_original_names else ["none"]
             metadata = {
                 "week":           week,
                 "day":            day,
@@ -302,9 +311,9 @@ def _sessions_to_documents(sessions: list[dict], sheet_name: str, source_path: s
                 "is_rest_day":    False,
                 "exercise_name": canonical,
                 "original_exercise_name": raw_name,
-                "exercise_aliases": aliases,
-                "exercise_names": all_canonical_names,
-                "original_exercise_names": all_original_names,
+                "exercise_aliases": safe_aliases,
+                "exercise_names": safe_canonical_names,
+                "original_exercise_names": safe_original_names,
                 "sheet_name":     sheet_name,
                 "source":         source_path,
             }

@@ -3,6 +3,10 @@ Hybrid Ensemble Retriever (BM25 + Chroma dense)
 """
 
 import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "core"))
+
 from langchain_community.retrievers import BM25Retriever
 from langchain_chroma import Chroma
 from langchain_classic.retrievers import EnsembleRetriever
@@ -11,6 +15,7 @@ from langchain_core.documents import Document
 from exercise_aliases import get_all_aliases, expand_query_aliases, normalize_exercise_name
 from ingest import build_alias_filter
 from reranker import rerank
+
 
 CHROMA_PERSIST_DIR = os.path.join(os.path.dirname(__file__), "chroma_db")
 COLLECTION_NAME = "workout_sessions"

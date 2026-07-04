@@ -31,9 +31,14 @@ Dense ─┘
 """
 from __future__ import annotations
 import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "core"))
+
 from huggingface_hub import scan_cache_dir
 from sentence_transformers import CrossEncoder
 from langchain_core.documents import Document
+
 
 # ---------------------------------------------------------------------------
 # Config

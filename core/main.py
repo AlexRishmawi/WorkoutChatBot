@@ -22,6 +22,9 @@ import argparse
 import json
 import os
 import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "core"))
+
 from ingest import load_workout_documents
 from pipeline import build_retriever
 from chain import build_rag_chain, build_rag_chain_with_sources, get_session_history

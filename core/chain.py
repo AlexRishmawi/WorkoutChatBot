@@ -1,6 +1,11 @@
 """
 RAG Chain: hybrid retriever -> LLM -> answer
 """
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "core"))
+
 from collections import defaultdict
 from operator import itemgetter
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -15,6 +20,7 @@ from langchain_classic.retrievers import EnsembleRetriever
 from exercise_aliases import expand_query_aliases
 from pipeline import get_exercise_history, search_by_exercise, search_sessions
 from langchain_chroma import Chroma
+
 
 # Inside chain.py
 
