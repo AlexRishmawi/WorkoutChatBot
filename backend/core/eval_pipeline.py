@@ -1,10 +1,10 @@
 import os
 import json
 from langchain_core.documents import Document
-from ingest import load_workout_documents
-from pipeline import build_retriever, search_sessions, get_program_size, CHROMA_PERSIST_DIR
+from backend.core.ingest import load_workout_documents
+from backend.core.pipeline import build_retriever, search_sessions, get_program_size, CHROMA_PERSIST_DIR
 from collections import defaultdict
-from eval_queries import EVAL_DATASET
+from backend.core.eval_queries import EVAL_DATASET
 
 API_KEY = os.getenv("GEMINI_API_KEY")
 CACHE_PATH = os.path.join(os.path.dirname(__file__), "vectorstore", "extracted_docs.json")

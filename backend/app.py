@@ -22,9 +22,9 @@ from pydantic import BaseModel, Field
 # Core imports from local modules
 from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage, AIMessage
-from core.ingest import load_workout_documents
-from core.pipeline import build_retriever, get_program_size
-from core.chain import build_rag_chain_with_sources, _condense_question, _format_docs
+from backend.core.ingest import load_workout_documents
+from backend.core.pipeline import build_retriever, get_program_size
+from backend.core.chain import build_rag_chain_with_sources, _condense_question, _format_docs
 
 # Configure local workspace paths
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "vectorstore")

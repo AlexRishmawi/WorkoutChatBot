@@ -4,3 +4,4 @@ chroma_db/
 vectorstore/
 WorkoutProgram.xlsx
 .env
+migration_plan.md
