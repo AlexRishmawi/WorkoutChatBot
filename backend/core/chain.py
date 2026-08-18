@@ -17,8 +17,8 @@ from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_classic.retrievers import EnsembleRetriever
-from backend.core.exercise_aliases import expand_query_aliases
-from backend.core.pipeline import get_exercise_history, search_by_exercise, search_sessions
+from exercise_aliases import expand_query_aliases
+from pipeline import get_exercise_history, search_by_exercise, search_sessions
 from langchain_chroma import Chroma
 
 

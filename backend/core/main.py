@@ -25,9 +25,9 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "core"))
 
-from backend.core.ingest import load_workout_documents
-from backend.core.pipeline import build_retriever
-from backend.core.chain import build_rag_chain, build_rag_chain_with_sources, get_session_history
+from ingest import load_workout_documents
+from pipeline import build_retriever
+from chain import build_rag_chain, build_rag_chain_with_sources, get_session_history
 from langchain_core.runnables import RunnableWithMessageHistory
 
 

@@ -1,5 +1,5 @@
-from backend.core.ingest import normalize_exercise_name
-from backend.core.ingest import get_all_aliases
+from ingest import normalize_exercise_name
+from ingest import get_all_aliases
 from langchain_core.documents import Document
 
 def _exercise_match(doc: Document, exercise_query: str) -> bool:

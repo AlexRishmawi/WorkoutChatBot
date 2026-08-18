@@ -5,3 +5,4 @@ vectorstore/
 WorkoutProgram.xlsx
 .env
 migration_plan.md
+ProductionImplementation

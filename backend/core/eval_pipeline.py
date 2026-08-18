@@ -1,13 +1,13 @@
 import os
 import json
 from langchain_core.documents import Document
-from backend.core.ingest import load_workout_documents
-from backend.core.pipeline import build_retriever, search_sessions, get_program_size, CHROMA_PERSIST_DIR
+from ingest import load_workout_documents
+from pipeline import build_retriever, search_sessions, get_program_size, CHROMA_PERSIST_DIR
 from collections import defaultdict
-from backend.core.eval_queries import EVAL_DATASET
+from eval_queries import EVAL_DATASET
 
 API_KEY = os.getenv("GEMINI_API_KEY")
-CACHE_PATH = os.path.join(os.path.dirname(__file__), "vectorstore", "extracted_docs.json")
+CACHE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "vectorstore", "extracted_docs.json"))
 
 def run_retriever_eval():
     if not os.path.exists(CACHE_PATH):
@@ -28,7 +28,7 @@ def run_retriever_eval():
     print("Initializing EnsembleRetriever...")
     # build_retriever returns (ensemble, vectorstore) — only the ensemble
     # is needed here since search_sessions wraps retriever.invoke().
-    retriever, _ = build_retriever(all_documents, API_KEY, force_rebuild=False)
+    retriever, _ = build_retriever(all_documents, API_KEY, force_rebuild=True)
     program_size = get_program_size(all_documents)
     print(f"[eval] Using dynamic sizing: k_retrieve={program_size['k_retrieve']}, n_rerank={program_size['n_rerank']}")
  

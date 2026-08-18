@@ -40,7 +40,7 @@ API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
 def print_section(title: str):
     print("\n" + "═" * 70)
-    print(f"🚀 {title}")
+    print(f" {title}")
     print("═" * 70)
 
 
@@ -50,7 +50,7 @@ def check_server_running() -> bool:
         requests.get(BASE_URL, timeout=2)
         return True
     except requests.exceptions.ConnectionError:
-        print(f"❌ Error: Cannot connect to FastAPI server at {BASE_URL}")
+        print(f" Error: Cannot connect to FastAPI server at {BASE_URL}")
         print("Please ensure your server is running by executing:")
         print("   python app.py")
         return False
@@ -74,7 +74,7 @@ def test_upload(xlsx_path: str):
     print_section(f"Testing /upload Endpoint with '{xlsx_path}'")
     
     if not os.path.exists(xlsx_path):
-        print(f"❌ Aborted: Local file '{xlsx_path}' not found.")
+        print(f" Aborted: Local file '{xlsx_path}' not found.")
         print("   To test the upload endpoint, please copy an actual .xlsx workout log")
         print("   to this directory and update the XLSX_PATH variable in this script.")
         return False
@@ -91,11 +91,11 @@ def test_upload(xlsx_path: str):
         
     print(f"HTTP Status Code: {response.status_code}")
     if response.status_code == 200:
-        print("🎉 Success! Program uploaded and indexed.")
+        print(" Success! Program uploaded and indexed.")
         print(json.dumps(response.json(), indent=2))
         return True
     else:
-        print(f"❌ Upload Failed: {response.text}")
+        print(f" Upload Failed: {response.text}")
         return False
 
 
@@ -126,16 +126,16 @@ def test_query(question: str, history: list = None) -> dict:
     print(f"HTTP Status Code: {response.status_code}")
     if response.status_code == 200:
         data = response.json()
-        print(f"\n🗣️ Condensed Standalone Query:\n   \"{data['standalone_query']}\"")
-        print(f"\n🤖 LLM Answer:\n{data['answer']}")
-        print(f"\n📂 Retrieved Sources: {len(data['sources'])} chunks")
+        print(f"\n Condensed Standalone Query:\n   \"{data['standalone_query']}\"")
+        print(f"\n LLM Answer:\n{data['answer']}")
+        print(f"\n Retrieved Sources: {len(data['sources'])} chunks")
         for idx, src in enumerate(data["sources"][:5], 1):
             print(f"   [{idx}] {src.get('week')} | {src.get('day')} | {src.get('exercise_name')}")
         if len(data["sources"]) > 5:
             print(f"   ... and {len(data['sources']) - 5} more sources.")
         return data
     else:
-        print(f"❌ Query Failed: {response.text}")
+        print(f" Query Failed: {response.text}")
         return {}
 
 
@@ -159,9 +159,9 @@ if __name__ == "__main__":
     # Inform the user what API key was loaded
     if API_KEY:
         masked_key = f"{API_KEY[:4]}...{API_KEY[-4:]}" if len(API_KEY) > 8 else "Found"
-        print(f"🔑 API Key resolved: {masked_key}")
+        print(f" API Key resolved: {masked_key}")
     else:
-        print("⚠️ Warning: No Gemini API Key was found in your environment or .env file.")
+        print(" Warning: No Gemini API Key was found in your environment or .env file.")
 
     # 1. Inspect initial server state
     status_data = test_status()
@@ -170,15 +170,15 @@ if __name__ == "__main__":
     is_indexed = status_data.get("is_indexed", False)
     
     if not is_indexed:
-        print("\n⚠️ Server does not have an active program indexed.")
+        print("\n Server does not have an active program indexed.")
         # If running from command line, allow passing spreadsheet path as argument
         test_file = sys.argv[1] if len(sys.argv) > 1 else XLSX_PATH 
         uploaded = test_upload(test_file)
         if not uploaded:
-            print("\n❌ Skipping query tests since no dataset could be uploaded.")
+            print("\n Skipping query tests since no dataset could be uploaded.")
             sys.exit(1)
     else:
-        print("\n✅ Server is already initialized with an active dataset. Proceeding directly to queries.")
+        print("\n Server is already initialized with an active dataset. Proceeding directly to queries.")
 
     # 3. Simulate a multi-turn conversation to test conversational condensation (history)
     chat_history = []

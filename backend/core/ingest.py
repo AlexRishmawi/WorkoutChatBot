@@ -9,9 +9,9 @@ import openpyxl
 from langchain_core.documents import Document
 from langchain_google_genai import ChatGoogleGenerativeAI
 from dotenv import load_dotenv
-from backend.core.exercise_aliases import normalize_exercise_name
-from backend.core.exercise_aliases import get_all_aliases
-from backend.core.exercise_aliases import expand_query_aliases
+from exercise_aliases import normalize_exercise_name
+from exercise_aliases import get_all_aliases
+from exercise_aliases import expand_query_aliases
 
 
 load_dotenv()

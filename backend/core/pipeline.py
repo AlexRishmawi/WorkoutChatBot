@@ -12,9 +12,9 @@ from langchain_chroma import Chroma
 from langchain_classic.retrievers import EnsembleRetriever
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_core.documents import Document
-from backend.core.exercise_aliases import get_all_aliases, expand_query_aliases, normalize_exercise_name
-from backend.core.ingest import build_alias_filter
-from backend.core.reranker import rerank
+from exercise_aliases import get_all_aliases, expand_query_aliases, normalize_exercise_name
+from ingest import build_alias_filter
+from reranker import rerank
 
 
 CHROMA_PERSIST_DIR = os.path.join(os.path.dirname(__file__), "chroma_db")
@@ -106,7 +106,7 @@ def build_retriever(documents: list[Document], api_key: str, force_rebuild: bool
     n_rerank = program_size["n_rerank"]
 
     print("\n" + "─"*60)
-    print("🧠 DYNAMIC SIZING REPORT")
+    print("DYNAMIC SIZING REPORT")
     print("─"*60)
     print(f"  ├─ Total documents parsed: {program_size['total_docs']}")
     print(f"  ├─ Program span detected: {program_size['weeks']} weeks")

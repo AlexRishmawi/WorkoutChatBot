@@ -20,7 +20,7 @@ single best match first, which is why MRR can drop even as recall rises.
 A cross-encoder fixes this final-mile ranking problem: it takes the
 (query, document) pair *together* as a single input and outputs a
 relevance score with full attention across both. It's too slow to run
-over your whole corpus, but it's cheap to run over the ~10-20 candidates
+over the whole corpus, but it's cheap to run over the ~10-20 candidates
 the ensemble retriever already narrowed things down to.
 
 Pipeline position
